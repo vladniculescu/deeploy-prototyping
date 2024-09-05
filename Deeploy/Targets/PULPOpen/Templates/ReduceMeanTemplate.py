@@ -80,7 +80,7 @@ ${data_out}_accumulator = ${input_offset}*${reduceLength};
 % for i in list(axes):
 for(uint32_t i_${i} = 0; i_${i}<${data_in_shape[i]}; i_${i}++){
 % endfor
-${data_out}_accumulator += ((${data_in_type.typeName} ${shapeStr})${data_in})${accessStr};
+${data_out}_accumulator += ((int8_t (*)${shapeStr})${data_in})${accessStr};
 
 % for i in range(len(axes)):
 }

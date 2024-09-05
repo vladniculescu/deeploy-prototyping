@@ -121,6 +121,7 @@ class PULPConv2DParser(RQSConv2DParser):
             self.operatorRepresentation['stride_x'] = int(self.operatorRepresentation['strides'][0])
             self.operatorRepresentation['stride_y'] = int(self.operatorRepresentation['strides'][1])
 
+
             return ret
         return False
 

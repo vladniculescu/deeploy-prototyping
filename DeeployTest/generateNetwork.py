@@ -64,6 +64,10 @@ if __name__ == '__main__':
     inputOffsets = {}
 
     inputs = np.load(f'{args.dir}/inputs.npz')
+    # for file_name in inputs.files:
+    #     array = inputs[file_name]
+    #     print(f" dtype = {array.dtype}, min = {array.min()}, max = {array.max()}")
+
     outputs = np.load(f'{args.dir}/outputs.npz')
     if os.path.isfile(f'{args.dir}/activations.npz'):
         activations = np.load(f'{args.dir}/activations.npz')

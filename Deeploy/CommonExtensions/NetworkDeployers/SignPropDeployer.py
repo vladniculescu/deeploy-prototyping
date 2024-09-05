@@ -58,6 +58,7 @@ class SignPropDeployer(NetworkDeployer):
             data_name = node.name
             nb = ctxt.lookup(data_name)
             data_type = self.inputTypes[data_name]
+            print(data_type)
             nb._signed = (self.inputOffsets[data_name] == 0)
             nb.nLevels = (2**data_type.referencedType.typeWidth)
 

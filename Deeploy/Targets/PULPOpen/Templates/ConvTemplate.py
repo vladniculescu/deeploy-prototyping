@@ -102,7 +102,8 @@ class PULP1DConvTemplate(NodeTemplate):
         operatorRepresentation['pad_x_left'] = operatorRepresentation['pads'][0]
         operatorRepresentation['pad_x_right'] = operatorRepresentation['pads'][1]
         operatorRepresentation['stride_x'] = operatorRepresentation['strides'][0]
-
+        
+        operatorRepresentation['dim_kernel_x'] = 1
         return ctxt, operatorRepresentation, []
 
     @staticmethod

@@ -113,7 +113,7 @@ class RQSParserInterface():
                 self.operatorRepresentation['n_levels'] = int(node.attrs['n_levels'].values)
             else:
                 self.operatorRepresentation['n_levels'] = int(node.attrs['n_levels_out'].values)
-            self.operatorRepresentation['signed'] = int(node.attrs['signed'].values)
+            self.operatorRepresentation['signed'] = 1
             self.operatorRepresentation['log2D'] = int(math.log2(node.attrs['div'].values))
 
         return ret

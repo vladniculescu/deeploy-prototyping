@@ -2496,12 +2496,10 @@ class NetworkContainer():
         ctxtStack = deque()
         scheduledLayerList = list(self.layerBinding.values())
         idx: int = 0
-
         deepestIdx = 0
 
         while (idx < len(scheduledLayerList)):
             currentLayer = scheduledLayerList[idx]
-
             stCtxt = copy.deepcopy(ctxt)
 
             newCtxt, parseSuccess = self._parseNode(currentLayer, ctxt, default_channels_first)
