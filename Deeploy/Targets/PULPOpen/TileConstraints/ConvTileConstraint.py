@@ -287,3 +287,229 @@ class Conv2DTileConstraint(TileConstraint):
         variableReplacementSchedule = VariableReplacementScheme(replacements, replacementTypes)
 
         return variableReplacementSchedule, tilingSchedule
+
+class Conv1DTileConstraint(TileConstraint):
+
+    @staticmethod
+    def addGeometricalConstraint(tilerModel: TilerModel, parseDict: Dict, ctxt: NetworkContext) -> TilerModel:
+        '''
+        This function add geometrical constraints for a PULP Im2Col Convolution Tilling.
+        '''
+
+        # Get to-be-tiled tensor's buffers
+        inputBufferName = parseDict['data_in']
+        weightBufferName = parseDict['weight']
+        mulBufferName = parseDict['mul']
+        addBufferName = parseDict['add']
+        outputBufferName = parseDict['data_out']
+
+        strides = parseDict["strides"]
+        padding = parseDict["pads"]
+        dilation = parseDict["dilations"]
+
+        # Add I/O dimensions to the model as variables
+        for bufferName in [inputBufferName, weightBufferName, mulBufferName, addBufferName, outputBufferName]:
+            tilerModel.addTensorDimToModel(ctxt, bufferName)
+
+        inputBatchVar = tilerModel.getTensorDimVar(tensorName = inputBufferName, dimIdx = 0)
+        inputWidthVar = tilerModel.getTensorDimVar(tensorName = inputBufferName, dimIdx = 1)
+        inputChannelVar = tilerModel.getTensorDimVar(tensorName = inputBufferName, dimIdx = 2)
+
+        weightOutChannelVar = tilerModel.getTensorDimVar(tensorName = weightBufferName, dimIdx = 0)
+        weightWidthVar = tilerModel.getTensorDimVar(tensorName = weightBufferName, dimIdx = 1)
+        weightInChannelVar = tilerModel.getTensorDimVar(tensorName = weightBufferName, dimIdx = 2)
+
+        outputBatchVar = tilerModel.getTensorDimVar(tensorName = outputBufferName, dimIdx = 0)
+        outputWidthVar = tilerModel.getTensorDimVar(tensorName = outputBufferName, dimIdx = 1)
+        outputChannelVar = tilerModel.getTensorDimVar(tensorName = outputBufferName, dimIdx = 2)
+
+        addChannelVar = tilerModel.getTensorDimVar(tensorName = addBufferName, dimIdx = 0)
+        mulChannelVar = tilerModel.getTensorDimVar(tensorName = mulBufferName, dimIdx = 0)
+
+        # Map output dims to inputs dims
+        tilerModel.addConstraint(outputBatchVar == inputBatchVar)  # Batch
+        tilerModel.addConstraint(outputChannelVar == weightOutChannelVar)  # Output Channel
+
+        tilerModel.addConstraint(outputChannelVar == addChannelVar)
+        tilerModel.addConstraint(outputChannelVar == mulChannelVar)
+
+        inputBuffer = ctxt.lookup(inputBufferName)
+
+        effectiveWidth = inputWidthVar + ((padding[0] + padding[1]) * (inputWidthVar == inputBuffer.shape[1]))
+        tilerModel.addConstraint((outputWidthVar == (effectiveWidth - (weightWidthVar - 1) - 1) // strides[0] + 1))
+
+        return tilerModel
+
+    @staticmethod
+    def addPolicyConstraint(tilerModel: TilerModel, parseDict: Dict, ctxt: NetworkContext) -> TilerModel:
+
+        # Get to-be-tiled tensor's buffers
+        inputBuffer = ctxt.lookup(name = parseDict['data_in'])
+        weightBuffer = ctxt.lookup(name = parseDict['weight'])
+
+        inputWidthVar = tilerModel.getTensorDimVar(tensorName = inputBuffer.name, dimIdx = 1)
+        inputChannelVar = tilerModel.getTensorDimVar(tensorName = inputBuffer.name, dimIdx = 2)
+
+        outputChannelVar = tilerModel.getTensorDimVar(tensorName = weightBuffer.name, dimIdx = 0)
+        weightWidthVar = tilerModel.getTensorDimVar(tensorName = weightBuffer.name, dimIdx = 1)
+        weightInChannelVar = tilerModel.getTensorDimVar(tensorName = weightBuffer.name, dimIdx = 2)
+
+        strides = parseDict["strides"]
+        padding = parseDict["pads"]
+
+        # VIC: Force at least one row of A and one col of B in the GEMM (since it's a im2col Conv) to avoid partial results
+        tilerModel.addConstraint(inputChannelVar == parseDict['ch_im_in'])
+
+        if (parseDict["ch_im_out"] >= 8):
+            tilerModel.addMinTileSizeConstraint(parseDict, 'ch_im_out', outputChannelVar, 8)
+
+        tilerModel.addConstraint(inputWidthVar >= parseDict['dim_kernel_y'])
+        tilerModel.addConstraint(weightInChannelVar == parseDict['ch_im_in'])
+
+        # VIC: Constraint the minimum tile size such that we can apply at least one kernel on it
+        tilerModel.addConstraint(inputWidthVar >= parseDict['dim_kernel_y'])
+        tilerModel.addConstraint(weightWidthVar == parseDict['dim_kernel_y'])
+        tilerModel.addConstraint((inputWidthVar % strides[0]) == 0)
+
+        return tilerModel
+
+    @staticmethod
+    def constructSymbolicNodeRep(tilerModel: TilerModel, parseDict: Dict,
+                                 ctxt: NetworkContext) -> Dict[str, Union[int, IntVar]]:
+
+        inputBuffer = ctxt.lookup(name = parseDict['data_in'])
+        weightBuffer = ctxt.lookup(name = parseDict['weight'])
+
+        symbolicParseDict = parseDict.copy()
+        symbolicParseDict['dim_im_in_x'] = tilerModel.getTensorDimVar(inputBuffer.name, 1)
+        symbolicParseDict['dim_kernel_x'] = tilerModel.getTensorDimVar(weightBuffer.name, 1)
+        symbolicParseDict['dim_kernel_y'] = tilerModel.getTensorDimVar(weightBuffer.name, 2)
+
+        return symbolicParseDict
+
+    @staticmethod
+    def computeMargins(kernelShape: Tuple[int, ...]) -> Tuple[int, ...]:
+        if kernelShape[1] % 2 == 0:
+            leftMargin = 0
+            rightMargin = 0
+        else:
+            leftMargin = ((kernelShape[1]) // 2)
+            rightMargin = ((kernelShape[1]) // 2)
+
+        if kernelShape[0] % 2 == 0:
+            topMargin = 0
+            bottomMargin = 0
+        else:
+            topMargin = ((kernelShape[0]) // 2)
+            bottomMargin = ((kernelShape[0]) // 2)
+
+        return leftMargin, rightMargin, topMargin, bottomMargin
+
+    @staticmethod
+    def computeInputCube(kernelShape: Tuple[int, ...], pads: Tuple[int, ...], strides: Tuple[int, ...],
+                         weightChannels: int, outputCube: HyperRectangle,
+                         outputDims: Tuple[int, ...]) -> Tuple[HyperRectangle, Tuple[int, ...]]:
+
+        (BatchOffset, HOffset, WOffset, COffset) = outputCube.offset
+        (BatchSize, HSize, WSize, CSize) = outputCube.dims
+
+        leftMargin, rightMargin, topMargin, bottomMargin = Conv2DTileConstraint.computeMargins((1, kernelShape))
+
+        padding_top = 0
+        padding_bottom = 0
+
+        padding_left = (WOffset == 0) * pads[1]
+        padding_right = (WOffset + WSize == outputDims[2]) * pads[3]
+
+        inputWOffset = WOffset * strides[1] - leftMargin * (WOffset != 0)
+
+        inputHSize = HSize
+        inputWSize = WSize * strides[1] + (leftMargin + rightMargin) - (padding_left + padding_right)
+
+        InCube = HyperRectangle((BatchOffset, inputHOffset, inputWOffset, 0),
+                                (BatchSize, inputHSize, inputWSize, weightChannels))
+
+        return InCube, (padding_left, padding_right, padding_top, padding_bottom)
+
+    @classmethod
+    def serializeTilingSolution(
+            cls, tilingSolution: NodeMemoryConstraint, absoluteOutputCubes: List[AbsoluteHyperRectangle],
+            targetMemLevel: str, ctxt: NetworkContext,
+            operatorRepresentation: OperatorRepresentation) -> Tuple[VariableReplacementScheme, TilingSchedule]:
+        outputCubes = [cube.rectangle for cube in absoluteOutputCubes]
+
+        addrNames = ['data_in', 'weight', 'mul', 'add', 'data_out']
+        inputBaseOffsets, outputBaseOffsets = cls.extractBaseAddr(tilingSolution, targetMemLevel,
+                                                                  operatorRepresentation, addrNames)
+
+        varWeight = operatorRepresentation['weight']
+        varOut = operatorRepresentation['data_out']
+
+        inputInCubes = []
+        inputAddCubes = []
+        inputMulCubes = []
+        inputWeightCubes = []
+        replacements: Dict[str, List[int]] = {
+            "dim_im_in_y": [],
+            "dim_im_out_y": [],
+            "ch_im_out": [],
+            "padding_x_left": [],
+            "padding_x_right": []
+        }
+
+        replacementTypes = {
+            "dim_im_in_y": PointerClass(uint16_t),
+            "dim_im_out_y": PointerClass(uint16_t),
+            "ch_im_out": PointerClass(uint16_t),
+            "padding_x_left": PointerClass(uint8_t),
+            "padding_x_right": PointerClass(uint8_t)
+        }
+
+        weightW = ctxt.lookup(varWeight).shape[1]
+        weightC = ctxt.lookup(varWeight).shape[2]
+
+        pads = operatorRepresentation['pads']
+        strides = operatorRepresentation['strides']
+
+        for cube in outputCubes:
+            (BatchOffset, WOffset, COffset) = cube.offset
+            (BatchSize, WSize, CSize) = cube.dims
+
+            patchCube = HyperRectangle((BatchOffset, 0, WOffset, COffset), (BatchSize, 1, WSize, CSize))
+
+            _InCube, padding_tuple = Conv2DTileConstraint.computeInputCube((1, weightW), (0, pads[0], 0, pads[1]), (1, strides[0]), weightC,
+                                                                          patchCube,
+                                                                          ctxt.lookup(varOut).shape)
+            InCube = HyperRectangle((_InCube.offset[0], _InCube.offset[2], _InCube.offset[3]),(_InCube.dims[0], _InCube.dims[2], _InCube.dims[3]))
+
+            padding_left, padding_right, padding_top, padding_bottom = padding_tuple
+
+            replacements['dim_im_in_y'].append(InCube.dims[1])
+            replacements['dim_im_out_y'].append(WSize)
+            replacements['ch_im_out'].append(CSize)
+
+            replacements['padding_x_left'].append(padding_left)
+            replacements['padding_x_right'].append(padding_right)
+
+            inputInCubes.append(InCube)
+
+            RequantCube = HyperRectangle((COffset,), (CSize,))
+            WeightCube = HyperRectangle((COffset, 0, 0), (CSize, weightW, weightC))
+
+            inputWeightCubes.append(WeightCube)
+            inputAddCubes.append(RequantCube)
+            inputMulCubes.append(RequantCube)
+
+        inputLoadSchedule = []
+        outputLoadSchedule = []
+
+        for a, b, add, mul in zip(inputInCubes, inputWeightCubes, inputAddCubes, inputMulCubes):
+            inputLoadSchedule.append({"data_in": a, "weight": b, "add": add, "mul": mul})
+
+        for out in outputCubes:
+            outputLoadSchedule.append({"data_out": out})
+
+        tilingSchedule = TilingSchedule(inputBaseOffsets, outputBaseOffsets, inputLoadSchedule, outputLoadSchedule)
+        variableReplacementSchedule = VariableReplacementScheme(replacements, replacementTypes)
+
+        return variableReplacementSchedule, tilingSchedule

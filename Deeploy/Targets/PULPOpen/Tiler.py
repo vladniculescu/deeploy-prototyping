@@ -28,7 +28,7 @@ import copy
 
 from Deeploy.CommonExtensions.CodeTransformationPasses.MemoryAllocation import MemoryPassthroughGeneration
 from Deeploy.DeeployTypes import CodeTransformation
-from Deeploy.Targets.Generic.Bindings import BasicAddBindings, BasicReshapeBindings
+from Deeploy.Targets.Generic.Bindings import BasicAddBindings, BasicReshapeBindings, BasicRQIntegerDivBinding
 from Deeploy.Targets.Generic.TileConstraints.AddTileConstraint import AddTileConstraint
 from Deeploy.Targets.Generic.TileConstraints.ConcatTileConstraint import ConcatTileConstraint
 from Deeploy.Targets.Generic.TileConstraints.iHardswishTileConstraint import iHardswishTileConstraint
@@ -45,21 +45,38 @@ from Deeploy.Targets.PULPOpen.Bindings import PULPConcatBindings, PULPiHardswish
     PULPRQSBindings, PULPRQSConv2DBindings, PULPRQSDWConv2DBindings, PULPRQSGEMMBindings, PULPRQSiHardswishBindings, \
     PULPRQSMatrixVecBindings, PULPRQSTallGEMMBindings, PULPSoftmaxBindings, PULPTransposeBindings, \
     PULPUniformRQSBindings, SimpleTransformer
-from Deeploy.Targets.PULPOpen.TileConstraints.ConvTileConstraint import Conv2DTileConstraint
-from Deeploy.Targets.PULPOpen.TileConstraints.DWConvTileConstraint import DWConv2DTileConstraint
+from Deeploy.Targets.PULPOpen.TileConstraints.ConvTileConstraint import Conv2DTileConstraint, Conv1DTileConstraint
+from Deeploy.Targets.PULPOpen.TileConstraints.DWConvTileConstraint import DWConv2DTileConstraint, DWConv1DTileConstraint
 from Deeploy.Targets.PULPOpen.TileConstraints.GEMMTileConstraint import GEMMTileConstraint, MatrixVecTileConstraint, \
     TallGEMMTileConstraint
 from Deeploy.Targets.PULPOpen.TileConstraints.iSoftmaxTileConstraint import iSoftmaxTileConstraint
 from Deeploy.Targets.PULPOpen.TileConstraints.MatMulTileConstraint import MatMulTileConstraint
 from Deeploy.Targets.PULPOpen.TileConstraints.MaxPoolTileConstraint import MaxPoolTileConstraint
 from Deeploy.Targets.PULPOpen.TileConstraints.RequantShiftTileConstraint import RequantShiftTileConstraint
+from Deeploy.Targets.PULPOpen.TileConstraints.PULPMulTileConstraint import PULPMulTileConstraint
+from Deeploy.Targets.PULPOpen.Bindings import PULPConv1DBinding, PULPDMASliceBindings, PULPDWConv1DBinding, PULPReduceMeanBindings
 from Deeploy.TilingExtension.TilerExtension import TilingReadyNodeBindings
+
+from Deeploy.Targets.Generic.TileConstraints.UntiledTileConstraint import UntiledTileConstraint
 
 PULPRQSConv2DTilingReadyBindings = TilingReadyNodeBindings(nodeBindings = PULPRQSConv2DBindings,
                                                            tileConstraint = Conv2DTileConstraint())
 
 PULPRQSDWConv2DTilingReadyBindings = TilingReadyNodeBindings(nodeBindings = PULPRQSDWConv2DBindings,
                                                              tileConstraint = DWConv2DTileConstraint())
+
+PULPRQSConv1DTilingReadyBindings = TilingReadyNodeBindings(nodeBindings = [PULPConv1DBinding],
+                                                           tileConstraint = Conv1DTileConstraint())
+
+PULPRQSDWConv1DTilingReadyBindings = TilingReadyNodeBindings(nodeBindings = [PULPDWConv1DBinding],
+                                                             tileConstraint = DWConv1DTileConstraint())
+
+PULPReduceMeanTilingReadyBindings = TilingReadyNodeBindings(nodeBindings = PULPReduceMeanBindings,
+                                                 tileConstraint = UntiledTileConstraint())
+
+PULPRQIntegerDivTilingReadyBindings = TilingReadyNodeBindings(nodeBindings = [BasicRQIntegerDivBinding],
+                                                 tileConstraint = UntiledTileConstraint())
+
 
 PULPRQSGEMMTilingReadyBindings = TilingReadyNodeBindings(nodeBindings = PULPRQSGEMMBindings,
                                                          tileConstraint = GEMMTileConstraint())
@@ -121,4 +138,4 @@ PULPiRQSGELUTilingReadyBindings = TilingReadyNodeBindings(nodeBindings = PULPiRQ
                                                           tileConstraint = RQSiGELUTileConstraint())
 
 PULPMulTilingReadyBindings = TilingReadyNodeBindings(nodeBindings = PULPMulBindings,
-                                                     tileConstraint = MulTileConstraint())
+                                                     tileConstraint = PULPMulTileConstraint())

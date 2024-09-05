@@ -198,6 +198,10 @@ class Tiler():
 
         wrapSchedule: List[SubGraph] = []
         for entry in schedule:
+
+            if not all([_entry.name in layerBinding.keys() for _entry in entry]):
+                continue
+
             if isinstance(entry, gs.Node):
                 wrapSchedule.append([entry])
             else:
@@ -354,8 +358,8 @@ class Tiler():
                 parseDict = layerBinding[node.name].mapper.parser.operatorRepresentation
                 template = layerBinding[node.name].mapper.binder.template
 
-                tilerModel = template.tileConstraint.addGeometricalConstraint(tilerModel,
-                                                                              parseDict = parseDict,
+
+                tilerModel = template.tileConstraint.addGeometricalConstraint(tilerModel,parseDict = parseDict,
                                                                               ctxt = ctxt)
 
                 tilerModel = template.tileConstraint.addPolicyConstraint(tilerModel, parseDict = parseDict, ctxt = ctxt)
@@ -674,6 +678,10 @@ class Tiler():
             mergedFlow = [deltaFlow(patternFlow)]
 
             for step, innerFlowState in zip(pattern, mergedFlow):
+
+                if step.op == "Constant":
+                    continue
+
                 transientBufferConstraints = self._generatePatternStepTransientBufferConstraints(
                     tilerModel, ctxt, layerBinding, step, targetMemoryLevelMapping)
 

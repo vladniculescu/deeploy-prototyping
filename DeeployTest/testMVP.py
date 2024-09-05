@@ -335,19 +335,7 @@ if __name__ == '__main__':
 
     # Instantiate Classes Requried for Memory Level Annotation Extension
     L3 = MemoryLevel(name = "L3", neighbourNames = ["L2"], size = 64000000)
-    L2 = MemoryLevel(name = "L2", neighbourNames = ["L3", "L1"], size = 512000)
-    L1 = MemoryLevel(name = "L1", neighbourNames = ["L2"], size = args.l1)
-    memoryLevels = [L3, L2, L1]
-
-    if args.neureka_wmem:
-        memoryLevels.append(MemoryLevel(name = "WeightMemory_SRAM", neighbourNames = [], size = 4 * 1024 * 1024))
-
-    memoryHierarchy = MemoryHierarchy(memoryLevels)
-    memoryHierarchy.setDefaultMemoryLevel(args.defaultMemLevel)
-
-    deployer = setupDeployer(graph,
-                             memoryHierarchy,
-                             defaultTargetMemoryLevel = L1,
+    L2 = MemoryLevel(name = "L2", neighbourNames = ["L3", "L1"], size = otMemoryLevel = L1,
                              defaultIoMemoryLevel = memoryHierarchy.memoryLevels[args.defaultMemLevel],
                              verbose = verbosityCfg,
                              overwriteRecentState = args.overwriteRecentState)

@@ -120,6 +120,10 @@ class TilerModel():
                       constraintExpression: IntExpr,
                       memoryLevel: Optional[MemoryLevel] = None,
                       strategy: Optional[AddConstraintStrategy] = None):
+
+        if constraintExpression.DebugString() == "FalseConstraint()":
+            raise RuntimeError("Tried to add infeasible constraint!")
+
         if isinstance(strategy, PerformanceHint):
             if memoryLevel is None:
                 self._performanceConstraints.append((strategy.priority, constraintExpression))
@@ -262,12 +266,14 @@ class TilerModel():
         offendingGeometricalConstraints: List[IntExpr] = []
         offendingMemoryConstraints: List[Tuple[MemoryLevel, IntVar, IntExpr]] = []
 
-        for constraint in self._constraints:
+        for idx, constraint in enumerate(self._constraints):
             if self._model.CheckConstraint(constraint):
+                print(f"Constraint okay {idx}/{len(self._constraints)}")
                 self._model.Add(constraint)
                 continue
 
             offendingGeometricalConstraints.append(constraint)
+            break
 
         if offendingGeometricalConstraints != []:
 

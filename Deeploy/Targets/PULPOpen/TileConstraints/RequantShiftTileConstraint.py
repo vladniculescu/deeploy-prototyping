@@ -76,6 +76,7 @@ class RequantShiftTileConstraint(TileConstraint):
 
         return tilerModel
 
+
     @classmethod
     def serializeTilingSolution(
             cls, tilingSolution: NodeMemoryConstraint, absoluteOutputCubes: List[AbsoluteHyperRectangle],

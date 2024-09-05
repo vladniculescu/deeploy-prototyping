@@ -273,7 +273,7 @@ class PULPClusterTilingSB(TilingCodeGeneration):
         else:
             _dir = 0
 
-        length_1d_copy = rect.dims[-1] * (referenceBuffer._type.referencedType.typeWidth // 8)
+        length_1d_copy = 1500 # rect.dims[-1] * (referenceBuffer._type.referencedType.typeWidth // 8)
 
         number_of_1d_copies = 1
         stride_1d = 0
